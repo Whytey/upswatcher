@@ -12,7 +12,7 @@ data = dict(
     author = 'David Whyte',
     author_email = 'david.whyte [at] gmail.com',
 
-    script_data = ['upsWatcher'],
+    scripts = ['upsWatcher'],
     data_files = [('/etc/init', ['upsWatcher.conf'])],
     )
 
