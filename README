@@ -1,0 +1,9 @@
+upsWatcher - 	A python script which queries the pwrstat command for
+CyberPower UPS's, parses the information and sends certain attributes
+to the Zabbix monitoring server.
+
+Note that this script relies on pwrstat which is available in the 
+PowerPanel software that can be downloaded from the CyberPower downloads 
+page - http://www.cyberpower-eu.com/products/software/pp_linux.htm
+
+CyberPower - http://www.cyberpower-eu.com
