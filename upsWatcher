@@ -1,16 +1,13 @@
 #!/usr/bin/env python
-# Query the ups.status from upsc and send it
-# to zabbix.
+# Query the status of pwrstat and send certain info
+# to Zabbix
 #
 # The is no error checking in this script!
 
+# # Config # #
 
 # How often to poll the UPS and report status in seconds.
 poll_interval = 15
-
-# The name of the UPS to monitor.  Should be listed 
-# under `upsc -l`.
-ups_name = 'Powerware5110'
 
 # The host running the zabbix-server.
 zabbix_server = '192.168.0.100'
@@ -18,49 +15,43 @@ zabbix_server = '192.168.0.100'
 # The name of the Zabbix host being monitored.
 zabbix_host = 'ups1'
 
-# The key of the monitored host.
-zabbix_key = 'ups.status'
+# The keys we are reporting on and how to find the data.
+zabbix_keys = {'State........................': 'ups.status',
+               'Battery Capacity.............': 'ups.battery.level',
+               'Load.........................': 'ups.load',
+               'Remaining Runtime............': 'ups.runtime',
+               'Power Supply by..............': 'ups.supplier'}
 
-# A mapping of output from upsc/nut to values being sent to Zabbix.
-# Note: only 'OB and 'OL' are certain.
-output_map = {'OB LB': '0', 'OB': '1', 'OL CHRG': '2', 'OL': '3'}
-
-# Unknown status returned.
-unknown_status = '4'
+# # Script # #
 
 import subprocess
 import time
 
 while True:
-  #Query nut for the one value.  Should return a single line.
-  upsc = subprocess.Popen(['upsc', ups_name, 'ups.status'],stdout=subprocess.PIPE)
-  while True:
-    # We only care about one line.
-    line = upsc.stdout.readline().rstrip()
-
-    # Command should have exited, if not kill it.
     try:
-      if not upsc.poll():
-        upsc.kill()
-    except:
-      print "Unexpected error:", sys.exc_info()[0]
-#    except Error:
-#      print "Error: ", e
-
-    print "Line: ", line
+        print "Getting status"
+        status = subprocess.Popen(['pwrstat', '-status'], stdout=subprocess.PIPE).communicate()[0]
+        print status
+    except subprocess.CalledProcessError:
+        print "Got a non-zero return code"
+        
+        
+    for line in status.splitlines():
+        line = line.lstrip()
+        if len(line) > 29:
+            key = line[:29]
+            if zabbix_keys.has_key(key): 
+                print "Stat: %s" % key
+                line = line[30:]
+                value = line.split()[0]
+                print "Value: %s" % value
+            
+                zabbix_key = zabbix_keys.get(key)
+                # Report status back.
+                print "Reporting stat: %s: %s" % (zabbix_key, value)
+                subprocess.call(['zabbix_sender', '-z', zabbix_server, '-s', zabbix_host, '-k', zabbix_key, '-o', value])
   
-    # Check we understand this.
-    if line in output_map.keys():
-      value = output_map[line]
-    else:
-      value = unknown_status
 
-    break
-
-  # Report status back.
-  subprocess.call(['zabbix_sender', '-z', zabbix_server, '-s', zabbix_host, '-k', zabbix_key, '-o', value])
-  
-
-  # Sleep until next time.
-  time.sleep(poll_interval)
+    # Sleep until next time.
+    time.sleep(poll_interval)
 
