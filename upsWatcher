@@ -24,16 +24,39 @@ zabbix_keys = {'State........................': 'ups.status',
 
 # # Script # #
 
+import logging
+import logging.handlers
+import os
 import subprocess
 import time
 
+# Setup the logger
+logger = logging.getLogger('upsWatcher')
+logger.setLevel(logging.DEBUG)
+
+logfile = "upsWatcher.log"
+# Determine the logger location
+if not os.path.exists(os.path.join(os.getcwd(), 'setup.py')):
+    # We are in production.
+    logfile = os.path.join("var", "log", logfile)
+
+# Add the log message handler to the logger
+file_handler = logging.handlers.RotatingFileHandler(
+               logfile, maxBytes=10240, backupCount=7)
+file_handler.setLevel(logging.DEBUG)
+
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(formatter)
+
+logger.addHandler(file_handler)
+
 while True:
     try:
-        print "Getting status"
+        logger.debug("Getting status")
         status = subprocess.Popen(['pwrstat', '-status'], stdout=subprocess.PIPE).communicate()[0]
-        print status
+        logger.debug(status)
     except subprocess.CalledProcessError:
-        print "Got a non-zero return code"
+        logger.warn("Got a non-zero return code when running pwrstat")
         
         
     for line in status.splitlines():
@@ -41,14 +64,14 @@ while True:
         if len(line) > 29:
             key = line[:29]
             if zabbix_keys.has_key(key): 
-                print "Stat: %s" % key
+                logger.debug("Stat: %s" % key)
                 line = line[30:]
                 value = line.split()[0]
-                print "Value: %s" % value
+                logger.debug("Value: %s" % value)
             
                 zabbix_key = zabbix_keys.get(key)
                 # Report status back.
-                print "Reporting stat: %s: %s" % (zabbix_key, value)
+                logger.info("Reporting stat: %s: %s" % (zabbix_key, value))
                 subprocess.call(['zabbix_sender', '-z', zabbix_server, '-s', zabbix_host, '-k', zabbix_key, '-o', value])
   
 
